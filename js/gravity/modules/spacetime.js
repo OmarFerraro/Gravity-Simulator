@@ -4,7 +4,7 @@ define([
 	'jquery',
 	'underscore'
 ], function($, _){
-	
+
 	// -----------
 	// | Private |
 	// -----------
@@ -13,21 +13,12 @@ define([
 		var spacetime = [];
 
 		// Simulation settings
-		var calculationsPerSec 	= 60; 	// How many gravitational calculations are performed a second
+		var calculationsPerSec 	= 100; 	// How many gravitational calculations are performed a second
 		var calculationSpeed 	= 1; 	// Speed comes at the cost of accuracy
 		var massMultiplier;				// How exagurated the size of the objects are (human readable)
-		var joinCollidingBodies = true;
 
 		// Calculation setInterval loop
 		var spacetimeLoop;
-
-		var debugLoop = setInterval(function(){
-			var totalMass = 0;
-
-			for (var i = 0; i < spacetime.length; i++) {
-				totalMass += spacetime[i].mass;
-			};
-		}, 1000);
 
 		// Takes object as argument, returns velocity as positive integer
 		function getVelocity(object){
@@ -61,12 +52,13 @@ define([
 			var radius = Math.cbrt(
 				(object.mass*object.density*massMultiplier) / (4/3*Math.PI)
 			);
-			
+
 			return radius;
 		}
 
 		function objectConstructor(object){
-
+            this.id = typeof object.id === "undefined" ? "celestial" + Date.now() : object.id;
+            this.color = typeof object.color === "undefined" ? "#000000" : object.color;
 			// Coords
 			this.x = object.x;
 			this.y = object.y;
@@ -113,6 +105,8 @@ define([
 					cameraFocus = true;
 				}
 
+                var id = objectA.mass > objectB.mass ? objectA.id : objectB.id;
+                var color = objectA.mass > objectB.mass ? objectA.color : objectB.color;
 				// New mass
 				var mass = objectA.mass + objectB.mass;
 
@@ -126,7 +120,7 @@ define([
 
 				// New density calculated from both objects mass and density
 				var density = objectA.density*objectA.mass/mass+
-							  objectB.density*objectB.mass/mass;
+						  	  objectB.density*objectB.mass/mass;
 
 				// New path is a copy of the larger object's path
 				var path = objectA.mass >= objectB.mass ? objectA.path : objectB.path;
@@ -134,21 +128,18 @@ define([
 				// Construct new object and add to spacetime
 				var newObject = new objectConstructor({
 					cameraFocus: 	cameraFocus,
+                    id:             id,
+                    color:          color,
 					x: 				x,
 					y: 				y,
 					velX: 			velX,
 					velY: 			velY,
-					mass: 			mass, 
+					mass: 			mass,
 					density: 		density,
 					path: 			path
 				});
 
 				addObject(newObject);
-
-				return true;
-			}
-			else {
-				return false;
 			};
 		}
 
@@ -164,7 +155,7 @@ define([
 
 						// getObjectDistance
 						var distance = getObjectDistance(objectA, objectB);
-						
+
 						// Find angle from vector. Fun note, if we reverse objectA and B we have anti-gravity
 						var angleToMass = Math.atan2(
 							objectB.y-objectA.y,
@@ -200,10 +191,10 @@ define([
 				if (object.path.length > Math.min(120, getObjectRadius(object) * 20 / getVelocity(object))) {
 					object.path.splice(0, 1);
 				};
-				
+
 				object.velX += object.deltaVelX * calculationSpeed;
 				object.velY += object.deltaVelY * calculationSpeed;
-				
+
 				object.x += object.velX * calculationSpeed;
 				object.y += object.velY * calculationSpeed;
 
@@ -218,17 +209,17 @@ define([
 	// ----------
 
 		var api = {};
+        api.originalModel = [];
 
 		// Initialize the api, call this before using
-		api.initialize = function(p_massMultiplier, p_joinCollidingBodies){
+		api.initialize = function(p_massMultiplier){
 			massMultiplier = p_massMultiplier;
-			joinCollidingBodies = p_joinCollidingBodies;
 		}
 
 		// ------------------------
 		// | Calculation settings |
 		// ------------------------
-		
+
 			api.calculationsPerSec = function(number){
 				calculationsPerSec = number;
 			}
@@ -252,55 +243,59 @@ define([
 			api.stopLoop = function(){
 				clearInterval(spacetimeLoop);
 			}
-			
+
 		// ------------------------
 		// | Spacetime object api |
 		// ------------------------
 
 			api.addObject = function(object){
+                this.originalModel.push(object);
 				addObject(object);
-			}
-
-			api.getFocusedObject = function () {
-				var flagFocused = false;
-				var i;
-				for (i = 0; i < spacetime.length; i++) {
-					if (spacetime[i].cameraFocus === true){
-						flagFocused = true;
-						break;
-					}
-				};
-				if (flagFocused)
-					return spacetime[i];
-				else if (spacetime.length != 0) {
-					api.cycleFocus();
-					return spacetime[0];
-				}
-				else
-					return false;
 			}
 
 			api.clearSpacetime = function(){
 				spacetime = [];
 			}
 
-			api.cycleFocus = function(direction){ //direction: whether forwards or backwards in array. True for next, false for previous
-				var objectFound = false;
+			api.clearFocus = function(){
+				for (var i = 0; i < spacetime.length; i++) {
+					if(spacetime[i].cameraFocus !== undefined && spacetime[i].cameraFocus === true){
+
+						spacetime[i].cameraFocus = false;
+
+						break;
+					}
+				};
+            }
+
+			api.cycleFocus = function(side){
+                var objectIndex = 0;
+                var objectId = "";
 
 				for (var i = 0; i < spacetime.length; i++) {
 					if(spacetime[i].cameraFocus !== undefined && spacetime[i].cameraFocus === true){
-						
+
 						spacetime[i].cameraFocus = false;
-						spacetime[((i + spacetime.length + ((direction) ? 1 : -1))%spacetime.length)].cameraFocus = true;
-						objectFound = true;
+                        objectIndex = i + side;
 
 						break;
 					}
 				};
 
-				if (objectFound !== true && spacetime.length > 0) {
-					spacetime[0].cameraFocus = true;
+                if(objectIndex === spacetime.length) {
+                    objectIndex = 0;
+                }
+
+                if(objectIndex < 0) {
+                    objectIndex = spacetime.length - 1;
+                }
+
+				if (spacetime.length > 0) {
+					spacetime[objectIndex].cameraFocus = true;
+                    objectId = spacetime[objectIndex].id;
 				};
+
+                return objectId;
 			}
 
 			api.getSpace = function(){
@@ -313,25 +308,18 @@ define([
 				// -----------------------------------------
 				// | Find clustering objects and join them |
 				// -----------------------------------------
-				function recursivelyJoinClusteringObjects(){
-					for (var a = spacetime.length - 1; a >= 0; a--) {
-						var objectA = spacetime[a];
 
-						for (var b = spacetime.length - 1; b >= 0; b--) {
-							if (a !== b) {
-								var objectB = spacetime[b];
+				for (var a = spacetime.length - 1; a >= 0; a--) {
+					var objectA = spacetime[a];
 
-								var joined = joinObjects(objectA, objectB);
+					for (var b = spacetime.length - 1; b >= 0; b--) {
+						if (a !== b) {
+							var objectB = spacetime[b];
 
-								if (joined === true) {
-									return recursivelyJoinClusteringObjects();
-								};
-							};
+							joinObjects(objectA, objectB);
 						};
 					};
-				}
-
-				if (joinCollidingBodies) recursivelyJoinClusteringObjects();
+				};
 
 				// ----------------------------------------
 				// | Newtons law of universal gravitation |
