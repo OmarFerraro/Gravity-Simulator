@@ -2,39 +2,10 @@
 // handles user input between spacetime and renderer
 var gui = null;
 var removeEntry = function (entry) {
-    var fieldset = document.getElementById(entry + "_entry");
-
     gui.deleteSpaceObject(entry);
-}
+};
 
-var collapseEntry = function (entry) {
-    var fieldset = document.getElementById(entry + "_entry");
-    var collapseButton = document.getElementById(entry + "_collapse");
-    var expandButton = document.getElementById(entry + "_expand");
-
-    collapseButton.dataset.visible = "false";
-    expandButton.dataset.visible = "true";
-    fieldset.dataset.collapsed = "true";
-}
-
-var openEntry = function (entry) {
-    var fieldset = document.getElementById(entry + "_entry");
-    var collapseButton = document.getElementById(entry + "_collapse");
-    var expandButton = document.getElementById(entry + "_expand");
-
-    collapseButton.dataset.visible = "true";
-    expandButton.dataset.visible = "false";
-    fieldset.dataset.collapsed = "false";
-}
-
-var cameraFocusChanged = function () {
-    gui.changeFocus();
-}
-
-define([
-    'jquery',
-    'underscore'
-], function ($, _) {
+define([], function () {
 
     /**************
      Private
@@ -46,6 +17,7 @@ define([
     var massMultiplier = undefined; // How exagurated the size of the objects are (humans like that)
     var support = undefined;
     var currentSystem = null;
+    var presetSystems = window.presetSystems;
     // Function that controls the left mouse which controls the massbuilder
     /*
      States:
@@ -105,7 +77,7 @@ define([
                 ;
                 break;
         }
-    }
+    };
 
     var mouseMove = function (e) {
         // console.log('x:' + e.clientX + ' y:' + e.clientY);
@@ -118,7 +90,7 @@ define([
         ;
 
         render.setMouse(mouse);
-    }
+    };
 
     /*************
      Public
@@ -154,12 +126,12 @@ define([
                 support.domInterface.focusContainer.dataset.visible = "false";
             }
         }
-    }
+    };
 
     guiApi.deleteSpaceObject = function (id) {
         delete currentSystem[id];
-        support.domInterface.codeDiv.innerHTML = this.prettyfyCode("Custom", currentSystem);
-        this.initializeCodeFields();
+        support.createSpaceObjectsFields("Custom");
+        support.initializeCodeFields();
         this.changeFocus();
 
         if (selectedButton) {
@@ -167,72 +139,9 @@ define([
         }
         currentButton = null;
         selectedButton = null;
-    }
+    };
 
     gui = guiApi;
-
-    guiApi.prettyfyCode = function (title, spaceObjects) {
-        var code = '<h2 id="systemTitle">' + title + '</h2>';
-
-        code += '<div><label>No cameraFocus';
-        code += ': <input id="noFocus" type="radio" name="cameraFocus" onclick="cameraFocusChanged(this);" checked /></div>';
-
-        for (var key in spaceObjects) {
-            var currentObject = spaceObjects[key];
-            var closeButton = '<span id="' + key + '_remove" onclick="removeEntry(\'' + key + '\')">&#11197;</span> ';
-            var collapseButton = '<span id="' + key + '_collapse" onclick="collapseEntry(\'' + key + '\')" data-visible="true">&#11206;</span>';
-            var expandButton = '<span id="' + key + '_expand" onclick="openEntry(\'' + key + '\')" data-visible="false">&#11208;</span>';
-
-            code += '<fieldset id="' + key + '_entry" data-collapsed="false"><legend> ' + closeButton + collapseButton + expandButton + key + '</legend>';
-
-            for (var label in currentObject) {
-                if (label !== "path" && label !== "id") {
-                    code += '<div>';
-                    code += '<label>' + label;
-
-                    if (label === "color") {
-                        code += ': <div class="colorBox" style="background-color: ' + currentObject[label] + '"></div>';
-                    } else if (label === "cameraFocus") {
-                        code += ': <input id="' + key + '_' + label + '" data-celestial="' + key + '" data-property="' + label + '" type="radio" name="cameraFocus" onclick="cameraFocusChanged(this);" ' + (currentObject[label] ? "checked" : "") + '/>';
-                    } else {
-                        code += ': <input id="' + key + '_' + label + '" data-celestial="' + key + '" data-property="' + label + '" type="text" class="spaceObjectProperty field" placeholder="' + currentObject[label] + '"/>';
-                    }
-                    code += '</label></div>';
-                }
-            }
-
-            code += "</fieldset>";
-        }
-
-        return code;
-    }
-
-    guiApi.resizeField = function (element) {
-        var text = element.value;
-        var id = element.dataset.celestial;
-        var property = element.dataset.property;
-
-        if (text === "") {
-            text = element.placeholder;
-        }
-
-        support.domInterface.widthCaluculator.dataset.visible = "true";
-        support.domInterface.widthCaluculator.innerHTML = text;
-        element.style.width = support.domInterface.widthCaluculator.offsetWidth + "px";
-        support.domInterface.widthCaluculator.dataset.visible = "false";
-
-        if ("" + currentSystem[id][property] !== text) {
-            document.getElementById("systemTitle").innerHTML = "Custom";
-            currentSystem[id][property] = parseFloat(text);
-
-            if (selectedButton) {
-                selectedButton.dataset.selected = "false";
-            }
-
-            currentButton = null;
-            selectedButton = null;
-        }
-    }
 
     guiApi.initSpaceSystem = function () {
         for (var key in currentSystem) {
@@ -240,20 +149,12 @@ define([
             currentSystem[key].id = key;
             spacetime.addObject(currentSystem[key]);
         }
-    }
+    };
 
-    guiApi.initializeCodeFields = function () {
-        var elements = document.getElementsByClassName("spaceObjectProperty field");
-        for (var i = 0; i < elements.length; i++) {
-            this.resizeField(elements[i]);
-            elements[i].addEventListener("input",
-                    function (evt) {
-                        guiApi.resizeField(evt.currentTarget);
-                    }
-            );
-        }
-    }
-
+    guiApi.getGravitySystem = function () {
+        return currentSystem;
+    };
+    
     guiApi.initialize = function (p_support, p_spacetime, p_render, p_canvas, p_massMultiplier) {
         support = p_support;
         spacetime = p_spacetime;
@@ -279,8 +180,8 @@ define([
                     "color": "#FFFF00"
                 };
 
-                support.domInterface.codeDiv.innerHTML = guiApi.prettyfyCode("Custom", currentSystem);
-                guiApi.initializeCodeFields();
+                support.createSpaceObjectsFields("Custom");
+                support.initializeCodeFields();
                 guiApi.changeFocus();
                 if (selectedButton) {
                     selectedButton.dataset.selected = "false";
@@ -328,7 +229,7 @@ define([
                     "cameraFocus": true,
                     "color": '#FFFF00'
                 }
-            }
+            };
 
             for (var i = 0; i < 100; i++) {
                 var radian = Math.random() * 2 * Math.PI;
@@ -356,8 +257,8 @@ define([
                 }
             }
 
-            support.domInterface.codeDiv.innerHTML = guiApi.prettyfyCode(this.value, currentSystem);
-            guiApi.initializeCodeFields();
+            support.createSpaceObjectsFields(this.value);
+            support.initializeCodeFields();
             guiApi.changeFocus();
         });
 
@@ -407,7 +308,7 @@ define([
         support.domInterface.toggleFocusContainer.addEventListener('click', function () {
             support.domInterface.focusContainer.dataset.visible = "" + this.checked;
             if (this.checked) {
-                support.domInterface.focusedId.innerHTML = spacetime.cycleFocus();
+                support.domInterface.focusedId.innerHTML = spacetime.cycleFocus(1);
             } else {
                 spacetime.clearFocus();
             }
@@ -422,9 +323,9 @@ define([
 
         for (var i = 0; i < presetSystems.length; i++) {
             if (presetSystems[i].default) {
-                presetTitles.innerHTML += '<div class="presetButton" data-system="' + i + '" data-selected="true">' + presetSystems[i].name + '</div>';
+                support.domInterface.presetTitles.innerHTML += '<div class="presetButton" data-system="' + i + '" data-selected="true">' + presetSystems[i].name + '</div>';
                 currentSystem = JSON.parse(JSON.stringify(presetSystems[i].spaceObjects));
-                support.domInterface.codeDiv.innerHTML = this.prettyfyCode(presetSystems[i].name, currentSystem);
+                support.createSpaceObjectsFields(presetSystems[i].name);
                 lastSelectedIndex = i;
             } else {
                 support.domInterface.presetTitles.innerHTML += '<div class="presetButton" data-system="' + i + '" data-selected="false">' + presetSystems[i].name + '</div>';
@@ -450,14 +351,14 @@ define([
                         }
                         currentButton.dataset.selected = "true";
                         selectedButton = currentButton;
-                        support.domInterface.codeDiv.innerHTML = guiApi.prettyfyCode(presetSystems[index].name, currentSystem);
-                        guiApi.initializeCodeFields();
+                        support.createSpaceObjectsFields(presetSystems[index].name);
+                        support.initializeCodeFields();
                         guiApi.changeFocus();
                     }
             );
         }
 
-        this.initializeCodeFields();
+        //support.initializeCodeFields();
         this.changeFocus();
 
         canvas.onmousedown = function (e) {

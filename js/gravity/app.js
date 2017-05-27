@@ -12,7 +12,7 @@ define([
 	'modules/spacetime',
 	'modules/gui',
         'modules/guiSupport'
-], function($, _, canvasUtil, render, spacetime, gui, guySupport){
+], function($, _, canvasUtil, render, spacetime, gui, guiSupport){
 
 	var app = {};
 
@@ -33,9 +33,9 @@ define([
 		render.initialize(canvas, spacetime, massMultiplier);
 		render.startLoop();
 
-		// Initialize GUI
+                // Initialize GUI
 		gui.initialize(guiSupport, spacetime, render, canvas, massMultiplier);
-	}
+	};
 
 	return app;
 
